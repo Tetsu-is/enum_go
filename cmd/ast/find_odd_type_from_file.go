@@ -7,9 +7,9 @@ import (
 	"go/token"
 )
 
-func satisfyOddInt(x int) bool {
-	return x%2 == 1
-}
+//func satisfyOddInt(x int) bool {
+//	return x%2 == 1
+//}
 
 func main() {
 	fPath := "./my_type/odd.go"

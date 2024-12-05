@@ -12,6 +12,94 @@ func satisfyOddInt(x int) bool {
 	return x%2 == 1
 }
 
+func registerTypeSpecs(file *ast.File, lVarList map[string]ast.TypeSpec) error {
+	dcls := file.Decls
+	for _, dcl := range dcls {
+		genDcl, ok := dcl.(*ast.GenDecl)
+		if !ok {
+			continue
+		}
+		specs := genDcl.Specs
+		for _, spec := range specs {
+			typeSpec, ok := spec.(*ast.TypeSpec)
+			if !ok {
+				continue
+			}
+			typeName := typeSpec.Name.Name
+			lVarList[typeName] = *typeSpec
+		}
+	}
+	if len(lVarList) == 0 {
+		return fmt.Errorf("Failed to find type declaration")
+	}
+	return nil
+}
+
+func getMainFuncDecl(file *ast.File) (*ast.FuncDecl, error) {
+	dcls := file.Decls
+	var mainFuncDecl *ast.FuncDecl
+	for _, dcl := range dcls {
+		fdcl, ok := dcl.(*ast.FuncDecl)
+		if !ok {
+			continue
+		}
+		if fdcl.Name.Name != "main" {
+			continue
+		}
+		mainFuncDecl = fdcl
+	}
+	if mainFuncDecl == nil {
+		return nil, fmt.Errorf("failed to find main function")
+	}
+	return mainFuncDecl, nil
+}
+
+func getAssignStmts(mainFunc *ast.FuncDecl) ([]*ast.AssignStmt, error) {
+	bodyList := mainFunc.Body.List
+	var assignStmts []*ast.AssignStmt
+	for _, stmt := range bodyList {
+		asmtStmt, ok := stmt.(*ast.AssignStmt)
+		if !ok {
+			continue
+		}
+		assignStmts = append(assignStmts, asmtStmt)
+	}
+	if len(assignStmts) == 0 {
+		return nil, fmt.Errorf("Failed to find assignment statement")
+	}
+	return assignStmts, nil
+}
+
+func satisfyAssignStmt(assignStmt *ast.AssignStmt) bool {
+	lhs := assignStmt.Lhs
+	lObj := lhs[0].(*ast.Ident).Obj
+	lType := lObj.Decl.(*ast.ValueSpec).Type
+
+	rhs := assignStmt.Rhs
+	rhsBasicLit := rhs[0].(*ast.BasicLit)
+	castedINTValue, err := strconv.Atoi(rhsBasicLit.Value)
+	if err != nil {
+		panic("Failed to cast value: " + err.Error())
+	}
+
+	isOdd := lType.(*ast.SelectorExpr).X.(*ast.Ident).Name == "my_type" && lType.(*ast.SelectorExpr).Sel.Name == "Odd"
+	// if not Odd type, SKIP
+	if !isOdd {
+		return true
+	}
+
+	// if not integer value, value does not satisfy Odd type
+	if rhsBasicLit.Kind != token.INT {
+		return false
+	}
+
+	if satisfyOddInt(castedINTValue) {
+		return false
+	}
+
+	return true
+}
+
 func main() {
 	lVarList := map[string]ast.TypeSpec{}
 
@@ -22,28 +110,8 @@ func main() {
 	if err != nil {
 		panic("Failed to parse file: " + err.Error())
 	}
-	fmt.Println("Parsed type definition file")
-	ast.Print(tfset, tfile)
-	// scan top level declarations
-	topLevelDecls := tfile.Decls
-	for _, decl := range topLevelDecls {
-		// pick up only type declaration
-		genDecl, ok := decl.(*ast.GenDecl)
-		if !ok {
-			continue
-		}
-		specs := genDecl.Specs // this contains TypeSpec
-		for _, spec := range specs {
-			typeSpec, ok := spec.(*ast.TypeSpec)
-			if !ok {
-				continue
-			}
-			// if it is type declaration, register the variable into lVarList
-			typeName := typeSpec.Name.Name
-			lVarList[typeName] = *typeSpec
-			fmt.Println("Save type declaration: " + typeName)
-			ast.Print(tfset, lVarList[typeName])
-		}
+	if err := registerTypeSpecs(tfile, lVarList); err != nil {
+		panic("Failed to register type specs: " + err.Error())
 	}
 	// 2. parse main file & check if the variable is Odd type
 
@@ -55,41 +123,24 @@ func main() {
 	}
 	fmt.Println("Parsed main file")
 
-	// find assignment statement
-	decls := file.Decls
-	var mainFunc *ast.FuncDecl
-	for _, d := range decls {
-		// find main function
-		funcDecl, ok := d.(*ast.FuncDecl)
-		if !ok {
-			continue
-		}
-
-		if funcDecl.Name.Name != "main" {
-			continue
-		}
-
-		mainFunc = funcDecl
+	mainFunc, err := getMainFuncDecl(file)
+	if err != nil {
+		panic("Failed to find main function")
 	}
 
 	if mainFunc == nil {
 		panic("Failed to find main function")
 	}
 
-	mainBodyList := mainFunc.Body.List
+	asmtStmts, err := getAssignStmts(mainFunc)
 	var is_odd_type bool = false
 	var is_odd_type_assigned bool = false
 	// find assignment statement
-	for _, stmt := range mainBodyList {
+	for _, asmtStmt := range asmtStmts {
 		//init
 		is_odd_type_assigned = false
 		is_odd_type_assigned = false
 
-		asmtStmt, ok := stmt.(*ast.AssignStmt)
-		if !ok {
-			continue
-		}
-		fmt.Println("Found assignment statement")
 		//ast.Print(fset, asmtStmt)
 
 		lhs := asmtStmt.Lhs
@@ -118,6 +169,11 @@ func main() {
 			fmt.Printf("%d is not assignable into Odd\n", castedIntValue)
 		}
 	}
+	//assignStmts, err := getAssignStmts(mainFunc)
+	//if err != nil {
+	//	panic("failed to find assignment statement")
+	//}
+
 	//ast.Print(fset, mainBodyList)
 	//ast.Print(fset, file)
 }
