@@ -70,7 +70,7 @@ func getAssignStmts(mainFunc *ast.FuncDecl) ([]*ast.AssignStmt, error) {
 	return assignStmts, nil
 }
 
-func satisfyAssignStmt(assignStmt *ast.AssignStmt) bool {
+func satisfyAssignStmt(assignStmt *ast.AssignStmt) error {
 	lhs := assignStmt.Lhs
 	lObj := lhs[0].(*ast.Ident).Obj
 	lType := lObj.Decl.(*ast.ValueSpec).Type
@@ -85,19 +85,20 @@ func satisfyAssignStmt(assignStmt *ast.AssignStmt) bool {
 	isOdd := lType.(*ast.SelectorExpr).X.(*ast.Ident).Name == "my_type" && lType.(*ast.SelectorExpr).Sel.Name == "Odd"
 	// if not Odd type, SKIP
 	if !isOdd {
-		return true
+		return nil
 	}
 
 	// if not integer value, value does not satisfy Odd type
 	if rhsBasicLit.Kind != token.INT {
-		return false
+		return fmt.Errorf("value is not integer type")
 	}
 
 	if satisfyOddInt(castedINTValue) {
-		return false
+		// msg tells place and reason of error
+		return fmt.Errorf("satisfy error: %v/%d is not asssignable into Odd type", assignStmt.TokPos, castedINTValue)
 	}
 
-	return true
+	return nil
 }
 
 func main() {
@@ -111,7 +112,7 @@ func main() {
 		panic("Failed to parse file: " + err.Error())
 	}
 	if err := registerTypeSpecs(tfile, lVarList); err != nil {
-		panic("Failed to register type specs: " + err.Error())
+		panic("Failed to reg                                                                                                                ister type specs: " + err.Error())
 	}
 	// 2. parse main file & check if the variable is Odd type
 
@@ -136,14 +137,14 @@ func main() {
 	var is_odd_type bool = false
 	var is_odd_type_assigned bool = false
 	// find assignment statement
-	for _, asmtStmt := range asmtStmts {
+	for _, asStmt := range asmtStmts {
 		//init
 		is_odd_type_assigned = false
 		is_odd_type_assigned = false
 
 		//ast.Print(fset, asmtStmt)
 
-		lhs := asmtStmt.Lhs
+		lhs := asStmt.Lhs
 		//fmt.Println("lhs")
 		//ast.Print(fset, lhs)
 		//fmt.Println("ast detail")
@@ -153,7 +154,7 @@ func main() {
 		if lhsType.(*ast.SelectorExpr).X.(*ast.Ident).Name == "my_type" && lhsType.(*ast.SelectorExpr).Sel.Name == "Odd" {
 			is_odd_type = true
 		}
-		rhs := asmtStmt.Rhs
+		rhs := asStmt.Rhs
 		//fmt.Println("rhs")
 		rhsBasicLit := rhs[0].(*ast.BasicLit)
 		castedIntValue, err := strconv.Atoi(rhsBasicLit.Value)
@@ -166,6 +167,8 @@ func main() {
 		}
 		//ast.Print(fset, rhs)
 		if is_odd_type && !is_odd_type_assigned {
+			// error position ex. "maing.go:10"
+			fmt.Println(fset.Position(asStmt.TokPos)) // fset.Positionを使えばfilename+lineができる
 			fmt.Printf("%d is not assignable into Odd\n", castedIntValue)
 		}
 	}
