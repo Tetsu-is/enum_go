@@ -11,7 +11,7 @@ import (
 //	return x%2 == 1
 //}
 
-func main() {
+func main1() {
 	fPath := "./my_type/odd.go"
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, fPath, nil, 0)
