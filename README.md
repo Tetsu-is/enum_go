@@ -16,5 +16,5 @@
 
 ### 偶数型のマイルストーン
 - [x] var宣言をBasicLitで初期化
-- [ ] 単純な代入文で右辺にUnderlyingTypeのBasicLitを代入
-- [ ] for文のiteratorでvar宣言をBasicLitで初期化
+- [x] 単純な代入文で右辺にUnderlyingTypeのBasicLitを代入
+- [ ] ~~for文のiteratorでvar宣言をBasicLitで初期化~~(これは標準のコンパイラで対応可能)

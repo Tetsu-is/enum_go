@@ -17,11 +17,8 @@ func main() {
 type Even int`
 	src1 := `package main
 func main() {
-    var x Even = 2
-	for i := 0; i < 10; i++ {
-		var y Even = 3
-		print(y)
-	}
+    var x Even = 0
+	x = 10
     print(x)
 }`
 
@@ -71,11 +68,21 @@ func main() {
 		case *ast.AssignStmt: // 代入文
 			for i, lhs := range node.Lhs {
 				if ident, ok := lhs.(*ast.Ident); ok {
-					if userDefinedTypes[ident.Name] {
-						if _, isLit := node.Rhs[i].(*ast.BasicLit); isLit {
-							if i, err := strconv.Atoi(node.Rhs[i].(*ast.BasicLit).Value); err == nil {
-								if !satisfyEvenInt(i) {
-									fmt.Printf("value is not even at %v\n", fset.Position(node.Pos()))
+					if ident.Obj != nil {
+						if decl, ok := ident.Obj.Decl.(*ast.ValueSpec); ok {
+							if decl.Type != nil {
+								if ident, ok := decl.Type.(*ast.Ident); ok {
+									if userDefinedTypes[ident.Name] {
+										if lit, ok := node.Rhs[i].(*ast.BasicLit); ok {
+											if lit.Kind == token.INT {
+												if i, err := strconv.Atoi(lit.Value); err == nil {
+													if !satisfyEvenInt(i) {
+														fmt.Printf("value is not even at %v\n", fset.Position(node.Pos()))
+													}
+												}
+											}
+										}
+									}
 								}
 							}
 						}

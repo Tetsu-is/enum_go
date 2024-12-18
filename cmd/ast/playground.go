@@ -1,11 +1,13 @@
 package main
 
-// type X int
+import "fmt"
 
-// func main() {
-// 	var x X
-// 	x = func() int {
-// 		return 1
-// 	}()
-// 	println(x)
-// }
+type X int
+
+func main() {
+	var x X
+	for i := 0; i < 10; i++ {
+		x = i
+		fmt.Println(x)
+	}
+}
