@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	var x my_type.Odd
-	x = 2
+	var x my_type.Even
+	x = 1
 	fmt.Println(x)
 }
