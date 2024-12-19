@@ -12,12 +12,34 @@ func satisfyEvenInt(x int) bool {
 	return x%2 == 0
 }
 
+type Enum struct {
+	Package string
+	Name    string
+	Type    string
+}
+
+func registerEnum(vs ast.ValueSpec, m map[string]Enum) {
+	// pick up the value
+	n := vs.Names[0].Name
+	// pick up type
+	t := vs.Type.(*ast.Ident).Name
+
+	m[n] = Enum{
+		Package: "hoge",
+		Name:    n,
+		Type:    t,
+	}
+}
+
 func main() {
 	typeDef := `package my_type
-type Even int`
+type Even int
+const Two Even = 2
+const Four Even = 4
+`
 	src1 := `package main
 func main() {
-    var x Even = 0
+    var x Even = 10
 	x = 10
     print(x)
 }`
@@ -28,8 +50,8 @@ func main() {
 	if err != nil {
 		panic("parse error" + err.Error())
 	}
-
 	// ユーザー定義型の名前を記録
+	// TODO: type <-> satisfy関数の対応もつけたいよね
 	userDefinedTypes := make(map[string]bool)
 	ast.Inspect(tf, func(n ast.Node) bool {
 		if typeSpec, ok := n.(*ast.TypeSpec); ok {
@@ -44,49 +66,73 @@ func main() {
 		panic("parse error" + err.Error())
 	}
 
+	ast.Print(fset, file)
+
 	// リテラル代入を検索
 	ast.Inspect(file, func(n ast.Node) bool {
 		switch node := n.(type) {
 		case *ast.ValueSpec: // var宣言
 			if node.Values != nil && len(node.Values) > 0 {
-				if ident, ok := node.Type.(*ast.Ident); ok {
-					if userDefinedTypes[ident.Name] {
-						for _, value := range node.Values {
-							if lit, ok := value.(*ast.BasicLit); ok {
-								if lit.Kind == token.INT {
-									if i, err := strconv.Atoi(lit.Value); err == nil {
-										if !satisfyEvenInt(i) {
-											fmt.Printf("value is not even at %v\n", fset.Position(node.Pos()))
-										}
-									}
-								}
-							}
-						}
+				ident, ok := node.Type.(*ast.Ident)
+				if !ok {
+					return false
+				}
+				if !userDefinedTypes[ident.Name] {
+					return false
+				}
+				for _, value := range node.Values {
+					lit, ok := value.(*ast.BasicLit)
+					if !ok {
+						continue
+					}
+					if lit.Kind != token.INT {
+						continue
+					}
+					i, err := strconv.Atoi(lit.Value)
+					if err != nil {
+						continue
+					}
+					if !satisfyEvenInt(i) {
+						fmt.Printf("value is not even at %v\n", fset.Position(node.Pos()))
 					}
 				}
 			}
 		case *ast.AssignStmt: // 代入文
 			for i, lhs := range node.Lhs {
-				if ident, ok := lhs.(*ast.Ident); ok {
-					if ident.Obj != nil {
-						if decl, ok := ident.Obj.Decl.(*ast.ValueSpec); ok {
-							if decl.Type != nil {
-								if ident, ok := decl.Type.(*ast.Ident); ok {
-									if userDefinedTypes[ident.Name] {
-										if lit, ok := node.Rhs[i].(*ast.BasicLit); ok {
-											if lit.Kind == token.INT {
-												if i, err := strconv.Atoi(lit.Value); err == nil {
-													if !satisfyEvenInt(i) {
-														fmt.Printf("value is not even at %v\n", fset.Position(node.Pos()))
-													}
-												}
-											}
-										}
-									}
-								}
-							}
-						}
-					}
+				ident, ok := lhs.(*ast.Ident)
+				if !ok {
+					continue
+				}
+				if ident.Obj == nil {
+					continue
+				}
+				decl, ok := ident.Obj.Decl.(*ast.ValueSpec)
+				if !ok {
+					continue
+				}
+				if decl.Type == nil {
+					continue
+				}
+				ident, ok = decl.Type.(*ast.Ident)
+				if !ok {
+					continue
+				}
+				if !userDefinedTypes[ident.Name] {
+					continue
+				}
+				lit, ok := node.Rhs[i].(*ast.BasicLit)
+				if !ok {
+					continue
+				}
+				if lit.Kind != token.INT {
+					continue
+				}
+				i, err := strconv.Atoi(lit.Value)
+				if err != nil {
+					continue
+				}
+				if !satisfyEvenInt(i) {
+					fmt.Printf("value is not even at %v\n", fset.Position(node.Pos()))
 				}
 			}
 		}
